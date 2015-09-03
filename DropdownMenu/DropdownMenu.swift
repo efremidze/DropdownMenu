@@ -17,7 +17,14 @@ extension UINavigationController {
             return _dropdownMenu
         }
         set {
+            let oldValue = _dropdownMenu
             _dropdownMenu = newValue
+            if let newValue = newValue where oldValue == nil {
+                newValue.navigationController = self
+                self.view.addSubview(newValue)
+            } else if newValue == nil {
+                oldValue?.removeFromSuperview()
+            }
         }
     }
     
@@ -26,24 +33,97 @@ extension UINavigationController {
 // MARK: - DropdownMenu
 class DropdownMenu: UIView {
     
-    var showsSearchBar: Bool = false
+    var items = [String]()
     
-    // handlers
-    var didSelectItemAtIndexHandler: ((Int) -> ())?
+    var isShown = false
+    
+    // configuration
+    var animationDuration: NSTimeInterval = 0.5
+    var maskBackgroundColor: UIColor = .blackColor()
+    var maskBackgroundOpacity: CGFloat = 0.3
+    var cellBackgroundColor: UIColor = .whiteColor()
+    var cellSeparatorColor: UIColor = .blackColor()
     
     // private
     private var navigationController: UINavigationController?
+    private let backgroundView = UIView()
     private let tableView = UITableView()
-    private var items = [String]()
+    private let separatorView = UIView()
     
-    required init(coder aDecoder: NSCoder) {
-        super.init(coder: aDecoder)
-    }
-    
-    init(items: [String]) {
-        super.init(frame: CGRect())
+    convenience init(items: [String]) {
+        self.init(frame: CGRect())
         
         self.items = items
+    }
+    
+    override func willMoveToSuperview(newSuperview: UIView?) {
+        super.willMoveToSuperview(newSuperview)
+        
+        if let newSuperview = newSuperview {
+            self.frame = newSuperview.bounds
+        }
+        if let navigationController = navigationController {
+            self.frame.origin.y = navigationController.navigationBar.frame.maxY
+            self.frame.size.height -= self.frame.origin.y
+        }
+        self.autoresizingMask = .FlexibleWidth | .FlexibleHeight
+        self.clipsToBounds = true
+        
+        backgroundView.backgroundColor = self.maskBackgroundColor
+        backgroundView.frame = self.bounds
+        backgroundView.autoresizingMask = .FlexibleWidth | .FlexibleHeight
+        
+        let tableHeaderView = UIView(frame: CGRect(x: 0, y: 0, width: self.frame.width, height: 300))
+        tableHeaderView.backgroundColor = self.cellBackgroundColor
+        tableView.tableHeaderView = tableHeaderView
+        
+        tableView.frame = self.bounds
+        tableView.frame.origin.y = -self.frame.height
+        tableView.frame.size.height += tableHeaderView.frame.height
+        tableView.autoresizingMask = .FlexibleWidth | .FlexibleHeight
+        tableView.tableFooterView = UIView()
+        tableView.dataSource = self
+        tableView.delegate = self
+        tableView.backgroundColor = .clearColor()
+        
+        self.addSubview(backgroundView)
+        self.addSubview(tableView)
+        
+        separatorView.frame = CGRect(x: 0, y: 0, width: self.frame.width, height: 0.5)
+        separatorView.autoresizingMask = .FlexibleWidth
+        separatorView.backgroundColor = cellSeparatorColor
+        self.addSubview(separatorView)
+        
+        self.hidden = true
+    }
+    
+    func showMenu() {
+        tableView.frame.origin.y = -self.frame.height
+        backgroundView.alpha = 0
+        self.hidden = false
+        UIView.animateWithDuration(animationDuration, delay: 0, usingSpringWithDamping: 0.7, initialSpringVelocity: 0.5, options: nil, animations: {
+            self.tableView.frame.origin.y = -(self.tableView.tableHeaderView?.frame.size.height ?? 0)
+            self.backgroundView.alpha = self.maskBackgroundOpacity
+        }, completion: nil)
+    }
+    
+    func hideMenu() {
+        self.backgroundView.alpha = self.maskBackgroundOpacity
+        UIView.animateWithDuration(animationDuration, animations: {
+            self.tableView.frame.origin.y = -self.frame.height
+            self.backgroundView.alpha = 0
+        }, completion: { _ in
+            self.hidden = true
+        })
+    }
+    
+    func toggleMenu() {
+        isShown = !isShown
+        if isShown {
+            showMenu()
+        } else {
+            hideMenu()
+        }
     }
     
 }
@@ -51,23 +131,11 @@ class DropdownMenu: UIView {
 // MARK: - UITableViewDataSource
 extension DropdownMenu: UITableViewDataSource {
     
-    func numberOfSectionsInTableView(tableView: UITableView) -> Int {
-        return 2
-    }
-    
     func tableView(tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        if section == 0 {
-            return showsSearchBar ? 1 : 0
-        }
         return items.count
     }
     
     func tableView(tableView: UITableView, cellForRowAtIndexPath indexPath: NSIndexPath) -> UITableViewCell {
-        if indexPath.section == 0 {
-            let cell = UITableViewCell(style: .Default, reuseIdentifier: "UITableViewCell")
-            return cell
-        }
-        
         let cell = UITableViewCell(style: .Value1, reuseIdentifier: "UITableViewCell")
         cell.textLabel?.text = items[safe: indexPath.row]
         return cell
@@ -79,9 +147,7 @@ extension DropdownMenu: UITableViewDataSource {
 extension DropdownMenu: UITableViewDelegate {
     
     func tableView(tableView: UITableView, didSelectRowAtIndexPath indexPath: NSIndexPath) {
-        if indexPath.section == 1 {
-            self.didSelectItemAtIndexHandler?(indexPath.row)
-        }
+        
     }
     
 }
