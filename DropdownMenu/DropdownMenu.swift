@@ -35,8 +35,6 @@ class DropdownMenu: UIView {
     
     var items = [String]()
     
-    var isShown = false
-    
     // configuration
     var animationDuration: NSTimeInterval = 0.5
     var maskBackgroundColor: UIColor = .blackColor()
@@ -50,67 +48,84 @@ class DropdownMenu: UIView {
     private let tableView = UITableView()
     private let separatorView = UIView()
     
+    private var tableViewTopConstraint = NSLayoutConstraint()
+    
+    private let tableHeaderViewHeight = CGFloat(300)
+    
+    private var tableViewHeight: CGFloat {
+        return tableHeaderViewHeight + self.frame.height
+    }
+    
     convenience init(items: [String]) {
         self.init(frame: CGRect())
         
         self.items = items
+        
+        initialize()
+    }
+    
+    func initialize() {
+        
     }
     
     override func willMoveToSuperview(newSuperview: UIView?) {
         super.willMoveToSuperview(newSuperview)
         
-        if let newSuperview = newSuperview {
-            self.frame = newSuperview.bounds
-        }
         if let navigationController = navigationController {
-            self.frame.origin.y = navigationController.navigationBar.frame.maxY
-            self.frame.size.height -= self.frame.origin.y
+            var frame = navigationController.view.bounds
+            frame.origin.y = navigationController.navigationBar.frame.maxY
+            frame.size.height -= frame.origin.y
+            self.frame = frame
         }
-        self.autoresizingMask = .FlexibleWidth | .FlexibleHeight
+        
         self.clipsToBounds = true
+        self.hidden = true
         
-        backgroundView.backgroundColor = self.maskBackgroundColor
-        backgroundView.frame = self.bounds
-        backgroundView.autoresizingMask = .FlexibleWidth | .FlexibleHeight
+        backgroundView.setTranslatesAutoresizingMaskIntoConstraints(false)
+        self.addSubview(backgroundView)
         
-        let tableHeaderView = UIView(frame: CGRect(x: 0, y: 0, width: self.frame.width, height: 300))
-        tableHeaderView.backgroundColor = self.cellBackgroundColor
-        tableView.tableHeaderView = tableHeaderView
-        
-        tableView.frame = self.bounds
-        tableView.frame.origin.y = -self.frame.height
-        tableView.frame.size.height += tableHeaderView.frame.height
-        tableView.autoresizingMask = .FlexibleWidth | .FlexibleHeight
-        tableView.tableFooterView = UIView()
         tableView.dataSource = self
         tableView.delegate = self
+        tableView.tableHeaderView = UIView(frame: CGRect(x: 0, y: 0, width: self.frame.width, height: tableHeaderViewHeight))
+        tableView.tableFooterView = UIView()
         tableView.backgroundColor = .clearColor()
-        
-        self.addSubview(backgroundView)
+        tableView.setTranslatesAutoresizingMaskIntoConstraints(false)
         self.addSubview(tableView)
         
-        separatorView.frame = CGRect(x: 0, y: 0, width: self.frame.width, height: 0.5)
-        separatorView.autoresizingMask = .FlexibleWidth
-        separatorView.backgroundColor = cellSeparatorColor
+        separatorView.setTranslatesAutoresizingMaskIntoConstraints(false)
         self.addSubview(separatorView)
         
-        self.hidden = true
+        let views = ["backgroundView": backgroundView, "tableView": tableView, "separatorView": separatorView]
+        self.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("|[separatorView]|", options: nil, metrics: nil, views: views))
+        self.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("|[backgroundView]|", options: nil, metrics: nil, views: views))
+        self.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("|[tableView]|", options: nil, metrics: nil, views: views))
+        self.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("V:|[separatorView(==0.5)]", options: nil, metrics: nil, views: views))
+        self.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("V:|[backgroundView]|", options: nil, metrics: nil, views: views))
+        self.addConstraint(NSLayoutConstraint(item: tableView, attribute: .Height, relatedBy: .Equal, toItem: nil, attribute: .NotAnAttribute, multiplier: 1, constant: tableViewHeight))
+        tableViewTopConstraint = NSLayoutConstraint(item: tableView, attribute: .Top, relatedBy: .Equal, toItem: self, attribute: .Top, multiplier: 1, constant: -tableViewHeight)
+        self.addConstraint(tableViewTopConstraint)
     }
     
     func showMenu() {
+        backgroundView.backgroundColor = self.maskBackgroundColor
+        tableView.tableHeaderView?.backgroundColor = self.cellBackgroundColor
+        separatorView.backgroundColor = cellSeparatorColor
         tableView.frame.origin.y = -self.frame.height
         backgroundView.alpha = 0
         self.hidden = false
+        tableViewTopConstraint.constant = -tableHeaderViewHeight
+        self.setNeedsUpdateConstraints()
         UIView.animateWithDuration(animationDuration, delay: 0, usingSpringWithDamping: 0.7, initialSpringVelocity: 0.5, options: nil, animations: {
-            self.tableView.frame.origin.y = -(self.tableView.tableHeaderView?.frame.size.height ?? 0)
+            self.layoutIfNeeded()
             self.backgroundView.alpha = self.maskBackgroundOpacity
         }, completion: nil)
     }
     
     func hideMenu() {
-        self.backgroundView.alpha = self.maskBackgroundOpacity
+        tableViewTopConstraint.constant = -tableViewHeight
+        self.setNeedsUpdateConstraints()
         UIView.animateWithDuration(animationDuration, animations: {
-            self.tableView.frame.origin.y = -self.frame.height
+            self.layoutIfNeeded()
             self.backgroundView.alpha = 0
         }, completion: { _ in
             self.hidden = true
@@ -118,8 +133,7 @@ class DropdownMenu: UIView {
     }
     
     func toggleMenu() {
-        isShown = !isShown
-        if isShown {
+        if self.hidden {
             showMenu()
         } else {
             hideMenu()
@@ -137,7 +151,7 @@ extension DropdownMenu: UITableViewDataSource {
     
     func tableView(tableView: UITableView, cellForRowAtIndexPath indexPath: NSIndexPath) -> UITableViewCell {
         let cell = UITableViewCell(style: .Value1, reuseIdentifier: "UITableViewCell")
-        cell.textLabel?.text = items[safe: indexPath.row]
+        cell.textLabel?.text = items[indexPath.row]
         return cell
     }
     
@@ -148,15 +162,6 @@ extension DropdownMenu: UITableViewDelegate {
     
     func tableView(tableView: UITableView, didSelectRowAtIndexPath indexPath: NSIndexPath) {
         
-    }
-    
-}
-
-// MARK: - Extensions
-extension Array {
-    
-    subscript (safe index: Int) -> T? {
-        return indices(self) ~= index ? self[index] : nil
     }
     
 }
