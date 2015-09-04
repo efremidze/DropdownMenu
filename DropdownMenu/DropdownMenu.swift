@@ -53,12 +53,6 @@ class DropdownMenu: UIView {
     
     private var tableViewTopConstraint = NSLayoutConstraint()
     
-    private let tableHeaderViewHeight = CGFloat(300)
-    
-    private var tableViewHeight: CGFloat {
-        return tableHeaderViewHeight + self.frame.height
-    }
-    
     convenience init(items: [String]) {
         self.init(frame: CGRect())
         
@@ -83,11 +77,15 @@ class DropdownMenu: UIView {
         
         tableView.dataSource = self
         tableView.delegate = self
-        tableView.tableHeaderView = UIView(frame: CGRect(x: 0, y: 0, width: self.frame.width, height: tableHeaderViewHeight))
         tableView.tableFooterView = UIView()
         tableView.backgroundColor = .clearColor()
         tableView.setTranslatesAutoresizingMaskIntoConstraints(false)
         self.addSubview(tableView)
+        
+        let view = UIView()
+        let textView = UITextView()
+        
+        tableView.tableHeaderView = view
         
         separatorView.setTranslatesAutoresizingMaskIntoConstraints(false)
         self.addSubview(separatorView)
@@ -98,19 +96,19 @@ class DropdownMenu: UIView {
         self.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("|[tableView]|", options: nil, metrics: nil, views: views))
         self.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("V:|[separatorView(==0.5)]", options: nil, metrics: nil, views: views))
         self.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("V:|[backgroundView]|", options: nil, metrics: nil, views: views))
-        self.addConstraint(NSLayoutConstraint(item: tableView, attribute: .Height, relatedBy: .Equal, toItem: nil, attribute: .NotAnAttribute, multiplier: 1, constant: tableViewHeight))
-        tableViewTopConstraint = NSLayoutConstraint(item: tableView, attribute: .Top, relatedBy: .Equal, toItem: self, attribute: .Top, multiplier: 1, constant: -tableViewHeight)
+        self.addConstraint(NSLayoutConstraint(item: tableView, attribute: .Height, relatedBy: .Equal, toItem: nil, attribute: .NotAnAttribute, multiplier: 1, constant: self.frame.height))
+        tableViewTopConstraint = NSLayoutConstraint(item: tableView, attribute: .Top, relatedBy: .Equal, toItem: self, attribute: .Top, multiplier: 1, constant: -self.frame.height)
         self.addConstraint(tableViewTopConstraint)
     }
     
     func showMenu() {
+        tableView.contentOffset = CGPoint(x: 0, y: 44)
         backgroundView.backgroundColor = maskBackgroundColor
-        tableView.tableHeaderView?.backgroundColor = cellBackgroundColor
         separatorView.backgroundColor = cellSeparatorColor
         tableView.frame.origin.y = -self.frame.height
         backgroundView.alpha = 0
         self.hidden = false
-        tableViewTopConstraint.constant = -tableHeaderViewHeight
+        tableViewTopConstraint.constant = 0
         self.setNeedsUpdateConstraints()
         UIView.animateWithDuration(animationDuration, delay: 0, usingSpringWithDamping: 0.7, initialSpringVelocity: 0.5, options: nil, animations: {
             self.layoutIfNeeded()
@@ -119,7 +117,7 @@ class DropdownMenu: UIView {
     }
     
     func hideMenu() {
-        tableViewTopConstraint.constant = -tableViewHeight
+        tableViewTopConstraint.constant = -self.frame.height
         self.setNeedsUpdateConstraints()
         UIView.animateWithDuration(animationDuration, animations: {
             self.layoutIfNeeded()
@@ -147,7 +145,7 @@ extension DropdownMenu: UITableViewDataSource {
     }
     
     func tableView(tableView: UITableView, cellForRowAtIndexPath indexPath: NSIndexPath) -> UITableViewCell {
-        let cell = UITableViewCell(style: .Value1, reuseIdentifier: "UITableViewCell")
+        let cell = UITableViewCell(style: .Value1, reuseIdentifier: UITableViewCell.nameOfClass)
         let item = items[indexPath.row]
         cell.textLabel?.text = item
         return cell
@@ -163,6 +161,33 @@ extension DropdownMenu: UITableViewDelegate {
         let item = items[indexPath.row]
         didSelectItemAtIndexPath?(item, indexPath)
         hideMenu()
+    }
+    
+}
+
+// MARK: - UIScrollViewDelegate
+extension DropdownMenu: UIScrollViewDelegate {
+    
+    func scrollViewWillEndDragging(scrollView: UIScrollView, withVelocity velocity: CGPoint, targetContentOffset: UnsafeMutablePointer<CGPoint>) {
+        if targetContentOffset.memory.y < 44 {
+            if (scrollView.contentOffset.y < 22) {
+                targetContentOffset.memory.y = 0
+            } else {
+                targetContentOffset.memory.y = 44
+            }
+        }
+    }
+    
+}
+
+extension NSObject {
+    
+    public class var nameOfClass: String {
+        return NSStringFromClass(self).componentsSeparatedByString(".").last!
+    }
+    
+    public var nameOfClass: String {
+        return NSStringFromClass(self.dynamicType).componentsSeparatedByString(".").last!
     }
     
 }
