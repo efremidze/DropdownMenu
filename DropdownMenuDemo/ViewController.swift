@@ -21,6 +21,9 @@ class ViewController: UIViewController {
         self.navigationItem.titleView = button
         
         let dropdownMenu = DropdownMenu(items: ["1", "2"])
+        dropdownMenu.didSelectItemAtIndexPath = { item, _ in
+            println(item)
+        }
         self.navigationController?.dropdownMenu = dropdownMenu
     }
 

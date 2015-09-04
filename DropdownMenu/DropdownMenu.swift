@@ -35,6 +35,9 @@ class DropdownMenu: UIView {
     
     var items = [String]()
     
+    // handlers
+    var didSelectItemAtIndexPath: ((String, NSIndexPath) -> ())?
+    
     // configuration
     var animationDuration: NSTimeInterval = 0.5
     var maskBackgroundColor: UIColor = .blackColor()
@@ -60,12 +63,6 @@ class DropdownMenu: UIView {
         self.init(frame: CGRect())
         
         self.items = items
-        
-        initialize()
-    }
-    
-    func initialize() {
-        
     }
     
     override func willMoveToSuperview(newSuperview: UIView?) {
@@ -77,7 +74,7 @@ class DropdownMenu: UIView {
             frame.size.height -= frame.origin.y
             self.frame = frame
         }
-        
+        self.autoresizingMask = .FlexibleWidth | .FlexibleHeight
         self.clipsToBounds = true
         self.hidden = true
         
@@ -107,8 +104,8 @@ class DropdownMenu: UIView {
     }
     
     func showMenu() {
-        backgroundView.backgroundColor = self.maskBackgroundColor
-        tableView.tableHeaderView?.backgroundColor = self.cellBackgroundColor
+        backgroundView.backgroundColor = maskBackgroundColor
+        tableView.tableHeaderView?.backgroundColor = cellBackgroundColor
         separatorView.backgroundColor = cellSeparatorColor
         tableView.frame.origin.y = -self.frame.height
         backgroundView.alpha = 0
@@ -151,7 +148,8 @@ extension DropdownMenu: UITableViewDataSource {
     
     func tableView(tableView: UITableView, cellForRowAtIndexPath indexPath: NSIndexPath) -> UITableViewCell {
         let cell = UITableViewCell(style: .Value1, reuseIdentifier: "UITableViewCell")
-        cell.textLabel?.text = items[indexPath.row]
+        let item = items[indexPath.row]
+        cell.textLabel?.text = item
         return cell
     }
     
@@ -161,7 +159,10 @@ extension DropdownMenu: UITableViewDataSource {
 extension DropdownMenu: UITableViewDelegate {
     
     func tableView(tableView: UITableView, didSelectRowAtIndexPath indexPath: NSIndexPath) {
-        
+        tableView.deselectRowAtIndexPath(indexPath, animated: true)
+        let item = items[indexPath.row]
+        didSelectItemAtIndexPath?(item, indexPath)
+        hideMenu()
     }
     
 }
