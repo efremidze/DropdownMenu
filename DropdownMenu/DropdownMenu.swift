@@ -122,7 +122,7 @@ class DropdownMenu: UIView {
     func showMenu() {
         filteredItems = items
         tableView.reloadData()
-        tableView.scrollToRowAtIndexPath(NSIndexPath(forRow: 0, inSection: 0), atScrollPosition: UITableViewScrollPosition.Top, animated: false)
+        tableView.contentOffset.y = 44
         backgroundView.backgroundColor = maskBackgroundColor
         separatorView.backgroundColor = cellSeparatorColor
         tableView.frame.origin.y = -self.frame.height
