@@ -34,6 +34,7 @@ extension UINavigationController {
 class DropdownMenu: UIView {
     
     var items = [String]()
+    var filteredItems = [String]()
     
     // handlers
     var didSelectItemAtIndexPath: ((String, NSIndexPath) -> ())?
@@ -51,13 +52,13 @@ class DropdownMenu: UIView {
     private let tableView = UITableView()
     private let separatorView = UIView()
     
+    static let operationQueue: NSOperationQueue = {
+        let operationQueue = NSOperationQueue()
+        operationQueue.maxConcurrentOperationCount = 1
+        return operationQueue
+    }()
+    
     private var tableViewTopConstraint = NSLayoutConstraint()
-    
-    private let tableHeaderViewHeight = CGFloat(300)
-    
-    private var tableViewHeight: CGFloat {
-        return tableHeaderViewHeight + self.frame.height
-    }
     
     convenience init(items: [String]) {
         self.init(frame: CGRect())
@@ -83,11 +84,26 @@ class DropdownMenu: UIView {
         
         tableView.dataSource = self
         tableView.delegate = self
-        tableView.tableHeaderView = UIView(frame: CGRect(x: 0, y: 0, width: self.frame.width, height: tableHeaderViewHeight))
+        tableView.tableHeaderView = UIView()
         tableView.tableFooterView = UIView()
         tableView.backgroundColor = .clearColor()
+        tableView.clipsToBounds = false
         tableView.setTranslatesAutoresizingMaskIntoConstraints(false)
         self.addSubview(tableView)
+        
+//        let view = UIView(frame: CGRect(x: 0, y: 0, width: self.frame.width, height: 44))
+//        view.backgroundColor = .whiteColor()
+//        view.autoresizingMask = .FlexibleWidth
+//        let textField = UITextField(frame: view.bounds)
+//        textField.placeholder = "Search"
+//        textField.autoresizingMask = .FlexibleWidth
+//        view.addSubview(textField)
+//        tableView.addSubview(view)
+//        tableView.tableHeaderView = view
+
+        let searchBar = UISearchBar(frame: CGRect(x: 0, y: 0, width: self.frame.width, height: 44))
+        searchBar.delegate = self
+        tableView.tableHeaderView = searchBar
         
         separatorView.setTranslatesAutoresizingMaskIntoConstraints(false)
         self.addSubview(separatorView)
@@ -98,19 +114,21 @@ class DropdownMenu: UIView {
         self.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("|[tableView]|", options: nil, metrics: nil, views: views))
         self.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("V:|[separatorView(==0.5)]", options: nil, metrics: nil, views: views))
         self.addConstraints(NSLayoutConstraint.constraintsWithVisualFormat("V:|[backgroundView]|", options: nil, metrics: nil, views: views))
-        self.addConstraint(NSLayoutConstraint(item: tableView, attribute: .Height, relatedBy: .Equal, toItem: nil, attribute: .NotAnAttribute, multiplier: 1, constant: tableViewHeight))
-        tableViewTopConstraint = NSLayoutConstraint(item: tableView, attribute: .Top, relatedBy: .Equal, toItem: self, attribute: .Top, multiplier: 1, constant: -tableViewHeight)
+        self.addConstraint(NSLayoutConstraint(item: tableView, attribute: .Height, relatedBy: .Equal, toItem: nil, attribute: .NotAnAttribute, multiplier: 1, constant: self.frame.height))
+        tableViewTopConstraint = NSLayoutConstraint(item: tableView, attribute: .Top, relatedBy: .Equal, toItem: self, attribute: .Top, multiplier: 1, constant: -self.frame.height)
         self.addConstraint(tableViewTopConstraint)
     }
     
     func showMenu() {
+        filteredItems = items
+        tableView.reloadData()
+        tableView.contentOffset.y = 44
         backgroundView.backgroundColor = maskBackgroundColor
-        tableView.tableHeaderView?.backgroundColor = cellBackgroundColor
         separatorView.backgroundColor = cellSeparatorColor
         tableView.frame.origin.y = -self.frame.height
         backgroundView.alpha = 0
         self.hidden = false
-        tableViewTopConstraint.constant = -tableHeaderViewHeight
+        tableViewTopConstraint.constant = 0
         self.setNeedsUpdateConstraints()
         UIView.animateWithDuration(animationDuration, delay: 0, usingSpringWithDamping: 0.7, initialSpringVelocity: 0.5, options: nil, animations: {
             self.layoutIfNeeded()
@@ -119,7 +137,7 @@ class DropdownMenu: UIView {
     }
     
     func hideMenu() {
-        tableViewTopConstraint.constant = -tableViewHeight
+        tableViewTopConstraint.constant = -self.frame.height
         self.setNeedsUpdateConstraints()
         UIView.animateWithDuration(animationDuration, animations: {
             self.layoutIfNeeded()
@@ -143,13 +161,14 @@ class DropdownMenu: UIView {
 extension DropdownMenu: UITableViewDataSource {
     
     func tableView(tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return items.count
+        return filteredItems.count
     }
     
     func tableView(tableView: UITableView, cellForRowAtIndexPath indexPath: NSIndexPath) -> UITableViewCell {
-        let cell = UITableViewCell(style: .Value1, reuseIdentifier: "UITableViewCell")
-        let item = items[indexPath.row]
-        cell.textLabel?.text = item
+        let cell = UITableViewCell(style: .Value1, reuseIdentifier: UITableViewCell.nameOfClass)
+        if let item = filteredItems[safe: indexPath.row] {
+            cell.textLabel?.text = item
+        }
         return cell
     }
     
@@ -160,9 +179,88 @@ extension DropdownMenu: UITableViewDelegate {
     
     func tableView(tableView: UITableView, didSelectRowAtIndexPath indexPath: NSIndexPath) {
         tableView.deselectRowAtIndexPath(indexPath, animated: true)
-        let item = items[indexPath.row]
-        didSelectItemAtIndexPath?(item, indexPath)
+        if let item = filteredItems[safe: indexPath.row] {
+            didSelectItemAtIndexPath?(item, indexPath)
+        }
         hideMenu()
+    }
+    
+}
+
+// MARK: - UIScrollViewDelegate
+extension DropdownMenu: UIScrollViewDelegate {
+    
+    func scrollViewDidEndDragging(scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+        if scrollView.contentOffset.y < 44 {
+            var point = scrollView.contentOffset
+            if (scrollView.contentOffset.y < 22) {
+                point.y = 0
+            } else {
+                point.y = 44
+            }
+            scrollView.setContentOffset(point, animated: true)
+        }
+    }
+    
+}
+
+// MARK: - UISearchBarDelegate
+extension DropdownMenu: UISearchBarDelegate {
+    
+    func searchBar(searchBar: UISearchBar, textDidChange searchText: String) {
+        let searchText = searchText.stringByTrimmingCharactersInSet(NSCharacterSet.whitespaceAndNewlineCharacterSet())
+        DropdownMenu.operationQueue.cancelAllOperations()
+        DropdownMenu.operationQueue.addOperationWithBlock {
+            if count(searchText) > 0 {
+                var matches = [String]()
+                var leftovers = Set(self.items)
+                matches += leftovers.filter({ $0.lowercaseString.hasPrefix(searchText) })
+                leftovers.subtractInPlace(matches)
+                matches += leftovers.filter({ $0.lowercaseString.contains(searchText) })
+                self.filteredItems = matches
+            } else {
+                self.filteredItems = self.items
+            }
+            NSOperationQueue.mainQueue().addOperationWithBlock {
+                self.tableView.reloadData()
+            }
+        }
+    }
+    
+}
+
+extension NSObject {
+    
+    public class var nameOfClass: String {
+        return NSStringFromClass(self).componentsSeparatedByString(".").last!
+    }
+    
+    public var nameOfClass: String {
+        return NSStringFromClass(self.dynamicType).componentsSeparatedByString(".").last!
+    }
+    
+}
+
+extension Array {
+    
+    subscript (safe index: Int) -> T? {
+        return indices(self) ~= index ? self[index] : nil
+    }
+    
+}
+
+extension Set {
+    
+    func filter(includeElement: (T) -> Bool) -> Set<T> {
+        return Set(Array(self).filter(includeElement))
+    }
+    
+}
+
+extension String {
+    
+    func contains(find: String) -> Bool {
+        return self.rangeOfString(find) != nil
     }
     
 }

@@ -20,7 +20,8 @@ class ViewController: UIViewController {
         button.addTarget(self, action: "didTouchOnButton:", forControlEvents: .TouchUpInside)
         self.navigationItem.titleView = button
         
-        let dropdownMenu = DropdownMenu(items: ["1", "2"])
+//        let dropdownMenu = DropdownMenu(items: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"])
+        let dropdownMenu = DropdownMenu(items: ["Julianne", "Eddie", "Patricia", "J.K.", "Alejandro"])
         dropdownMenu.didSelectItemAtIndexPath = { item, _ in
             println(item)
         }
